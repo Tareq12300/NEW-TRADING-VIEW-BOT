@@ -527,8 +527,9 @@ def send_signal(symbol, trade, rsi, diff, yesterday, today, ticker24h, eid, cmc,
         p.append(line + ")")
     p.append("• ⚖️ المخاطرة/العائد (لآخر هدف): 1:{:.2g}".format(rr))
 
-    p += ["\n📈 <b>المؤشرات</b>",
-          "• RSI: {:.2f} ({})".format(rsi, rsi_state(rsi))]
+    p.append("\n📈 <b>المؤشرات</b>")
+    if USE_RSI_FILTER:
+        p.append("• RSI: {:.2f} ({})".format(rsi, rsi_state(rsi)))
     if stoch:
         p.append("• Stoch RSI: %K {:.1f} / %D {:.1f}".format(stoch[0], stoch[1]))
     if vol_ratio is not None:

@@ -509,11 +509,19 @@ def send_stop_hit(symbol, trade, price, eid):
 
 
 def welcome_text(symbols, exchanges):
+    if USE_LONG_FILTER and USE_SHORT_FILTER:
+        kinds = "شراء وبيع (Long/Short)"
+    elif USE_LONG_FILTER:
+        kinds = "شراء فقط (Long)"
+    elif USE_SHORT_FILTER:
+        kinds = "بيع فقط (Short)"
+    else:
+        kinds = "لا شيء (كل الإشارات معطّلة)"
     return "\n".join([
         "👋 <b>أهلاً بك في بوت مؤشر أبو علاوي المتكتك</b>",
         "",
         "يراقب البوت العملات على فريم <b>{}</b> ويرسل لك:".format(TIMEFRAME),
-        "• إشارات الدخول (شراء/بيع)",
+        "• إشارات الدخول — <b>{}</b>".format(kinds),
         "• تنبيه عند تحقق كل هدف",
         "• تنبيه عند ضرب وقف الخسارة",
         "• تقرير نسبة النجاح (Winrate) نهاية كل أسبوع",

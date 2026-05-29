@@ -408,7 +408,14 @@ def send_telegram(text, reply_markup=None, _retries=3):
             if _retries > 0:
                 return send_telegram(text, reply_markup, _retries - 1)
             return
-        r.raise_for_status()
+        if not r.ok:
+            desc = ""
+            try:
+                desc = r.json().get("description", "")
+            except Exception:
+                desc = r.text[:200]
+            print("فشل إرسال تليجرام [{}]: {}".format(r.status_code, desc))
+            return
     except Exception as exc:
         print("خطأ في إرسال رسالة تليجرام:", exc)
 

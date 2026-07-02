@@ -1,53 +1,70 @@
-# بوت مؤشر أبو علاوي - Gate.io + CoinMarketCap
+# Advanced Crypto Pump Signal Bot
 
-## المواصفات
-- المنصة: Gate.io فقط
-- الفريم الافتراضي: 4h
-- الإشارات: شراء فقط
-- مصدر قائمة العملات: CoinMarketCap API
-- التصنيفات: AI + Cloud Computing + Storage
-- يرسل التنبيه عند إغلاق شمعة 4 ساعات فقط إذا كان:
-  `SIGNAL_ON_CANDLE_CLOSE_ONLY=true`
+بوت تيليجرام متقدم لاكتشاف العملات المرشحة للصعود المبكر عبر DexScreener وGeckoTerminal وCoinGecko Trending مع فحص RugCheck لسولانا.
+
+> تنبيه: البوت لا يتنبأ بالمستقبل ولا يعطي توصيات شراء. هو فلتر إشارات مبكرة فقط.
 
 ## الملفات
-- `bot.py`
-- `requirements.txt`
-- `railway.json`
-- `.env.example`
 
-## متغيرات Railway المطلوبة
-انسخ متغيرات `.env.example` إلى Railway Variables.
+- `bot.py` البوت كامل.
+- `requirements.txt` المكتبات.
+- `.env.example` إعدادات Railway أو التشغيل المحلي.
+- `data/` يتم إنشاؤه لحفظ حالة التنبيهات والتعلم المحلي.
 
-الأهم:
-```env
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
-CMC_API_KEY=
-SIGNAL_ON_CANDLE_CLOSE_ONLY=true
-```
+## التشغيل محليًا
 
-## معنى SIGNAL_ON_CANDLE_CLOSE_ONLY
-```env
-SIGNAL_ON_CANDLE_CLOSE_ONLY=true
-```
-يعني البوت ينتظر إغلاق شمعة 4H مثل TradingView.
-
-```env
-SIGNAL_ON_CANDLE_CLOSE_ONLY=false
-```
-يعني يفحص الشمعة الحالية وهي تتكون، وقد يعطي إشارة قبل إغلاق الشمعة.
-
-## طريقة التشغيل محلياً
 ```bash
 pip install -r requirements.txt
+cp .env.example .env
 python bot.py
 ```
 
-## طريقة التشغيل على Railway
-1. ارفع الملفات على GitHub.
-2. اربط المستودع مع Railway.
-3. أضف Variables من `.env.example`.
-4. Deploy.
+عدّل في `.env`:
 
-## ملاحظة مهمة
-نتائج البوت قد تختلف قليلاً عن TradingView إذا كان مصدر بيانات TradingView مختلفاً عن Gate.io.
+```env
+TELEGRAM_BOT_TOKEN=توكن البوت
+TELEGRAM_CHAT_ID=رقم الشات
+MIN_VOLUME_RATIO=3
+```
+
+## التشغيل على Railway
+
+1. ارفع الملفات إلى GitHub.
+2. اربط المشروع في Railway.
+3. أضف المتغيرات الموجودة في `.env.example` داخل Variables.
+4. شغّل المشروع.
+
+## منطق السكور
+
+البوت يعطي Score من 100 بناءً على:
+
+- Volume Ratio
+- Liquidity
+- 24h Volume
+- Market Cap / FDV
+- Buy/Sell Ratio
+- Momentum 5m / 1h / 6h / 24h
+- عمر الزوج
+- وجود العملة في ترند CoinGecko
+- فحص RugCheck لسولانا
+
+## أهم الإعدادات
+
+```env
+MIN_SCORE=78
+MIN_VOLUME_RATIO=3
+MIN_LIQUIDITY_USD=100000
+MIN_VOLUME_24H_USD=100000
+MIN_BUY_SELL_RATIO=1.15
+MAX_PRICE_CHANGE_1H=90
+```
+
+إذا أردت إشارات أكثر خفّض `MIN_SCORE` إلى 70.
+إذا أردت إشارات أقوى ارفع `MIN_SCORE` إلى 85.
+
+## ملاحظات مهمة
+
+- RugCheck يعمل فقط على سولانا.
+- بعض APIs العامة عليها Rate Limit.
+- راجع العقد والسيولة والضرائب يدويًا قبل أي قرار.
+- لا تستخدم كامل رأس المال على إشارات البوت.

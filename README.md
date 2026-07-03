@@ -35,3 +35,8 @@ python bot.py
 - لا يستخدم DexScreener.
 - لا يستخدم CoinGecko.
 - يعتمد فقط على ccxt + numpy.
+
+
+## Volume filter
+
+The bot filters pairs with 24h quote volume below 100,000 USDT by default using `MIN_DAILY_VOLUME_USDT=100000`.

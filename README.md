@@ -1,42 +1,16 @@
-# Stoch RSI + MACD 4H Bot — No Pandas
+# TradingView-style Stoch RSI + MACD 4H Bot
 
-بوت تيليجرام يفحص أزواج USDT على عدة منصات باستخدام CCXT، ويعتمد فقط على:
+Railway-ready Telegram bot.
 
-- Stochastic RSI
-- MACD
-- فريم 4H
+- No pandas
+- Uses CCXT
+- Timeframe 4H
+- Stoch RSI uses TradingView-style Wilder RSI + SMA K/D
+- MACD uses EMA 12/26/9
+- Filters by 4H candle volume in USDT
 
-## Railway Variables
-
-انسخ من `.env.example` وضع القيم في Railway Variables.
-
-أهم القيم:
-
-```env
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
-TIMEFRAME=4h
-EXCHANGES=binance,bybit,okx,bitget,mexc,gateio,kucoin
-STOCH_MAX=40
-REQUIRE_STOCH_CROSS=true
-REQUIRE_MACD_POSITIVE=true
-REQUIRE_MACD_HISTOGRAM_UP=true
-```
+## Railway variables
+Use the variables from `.env.example`.
 
 ## Start command
-
-```bash
-python bot.py
-```
-
-## ملاحظات
-
-- لا يستخدم pandas.
-- لا يستخدم DexScreener.
-- لا يستخدم CoinGecko.
-- يعتمد فقط على ccxt + numpy.
-
-
-## Volume filter
-
-The bot filters pairs with 24h quote volume below 100,000 USDT by default using `MIN_DAILY_VOLUME_USDT=100000`.
+`python bot.py`

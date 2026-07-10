@@ -15,6 +15,8 @@ from telegram import Bot
 
 load_dotenv()
 
+BOT_VERSION = "2026-07-10-stock-filter-v2"
+
 
 def env_str(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip().strip('"').strip("'")
@@ -81,6 +83,41 @@ MEMECOIN_BASES = {
 LEVERAGED_SUFFIXES = (
     "3L", "3S", "5L", "5S", "BULL", "BEAR", "UP", "DOWN",
 )
+
+
+TOKENIZED_STOCK_KEYWORDS = (
+    "tokenized stock",
+    "tokenised stock",
+    "stock token",
+    "tokenized equity",
+    "tokenised equity",
+    "equity token",
+    "xstocks",
+    "xstock",
+    "real world stock",
+    "stock-backed",
+    "stock backed",
+)
+
+STOCK_TICKERS = {
+    "AAPL", "ABBV", "ABT", "ACN", "ADBE", "AMD", "AMAT", "AMGN",
+    "AMZN", "ARM", "ASML", "AVGO", "AXP", "BA", "BABA", "BAC",
+    "BRK", "CAT", "COIN", "COST", "CRM", "CRWD", "CSCO", "CVX",
+    "DIS", "DOW", "GE", "GM", "GOOG", "GOOGL", "GS", "HD",
+    "HON", "IBM", "INTC", "JNJ", "JPM", "KO", "LIN", "LLY",
+    "LMT", "LOW", "MA", "MCD", "META", "MMM", "MRK", "MSTR",
+    "MSFT", "NFLX", "NKE", "NOW", "NVDA", "NVO", "ORCL", "PEP",
+    "PFE", "PG", "PLTR", "PYPL", "QCOM", "RDDT", "ROKU", "SBUX",
+    "SHOP", "SLB", "SNOW", "SOFI", "SPOT", "T", "TEAM", "TSLA",
+    "TSM", "UBER", "UNH", "V", "VZ", "WMT", "XOM", "ZM",
+}
+
+TOKENIZED_STOCK_BASES = {
+    "RSLB", "RAAPL", "RTSLA", "RNVDA", "RAMZN", "RMSFT", "RMETA",
+    "RGOOG", "RGOOGL", "RCOIN", "RMSTR", "RNFLX", "RPLTR", "RAMD",
+    "AAPLX", "TSLAX", "NVDAX", "AMZNX", "MSFTX", "METAX",
+    "GOOGLX", "GOOGX", "COINX", "MSTRX", "NFLXX", "PLTRX",
+}
 
 MAX_SIGNALS_PER_SCAN = env_int("MAX_SIGNALS_PER_SCAN", 100)
 SIGNAL_COOLDOWN_HOURS = env_float("SIGNAL_COOLDOWN_HOURS", 6)
@@ -274,6 +311,46 @@ def build_targets_block(entry_price: float) -> str:
 
 
 
+def is_tokenized_stock(exchange_id: str, symbol: str, market: Dict[str, Any]) -> bool:
+    base_raw = str(market.get("base", "") or "").strip()
+    base = base_raw.upper()
+    symbol_upper = str(symbol).upper().strip()
+
+    if base in TOKENIZED_STOCK_BASES:
+        return True
+
+    searchable_market_data = {
+        "id": market.get("id"),
+        "symbol": market.get("symbol"),
+        "base": market.get("base"),
+        "quote": market.get("quote"),
+        "type": market.get("type"),
+        "subType": market.get("subType"),
+        "info": market.get("info", {}),
+    }
+    market_text = json.dumps(
+        searchable_market_data,
+        ensure_ascii=False,
+        default=str,
+    ).lower()
+
+    if any(keyword in market_text for keyword in TOKENIZED_STOCK_KEYWORDS):
+        return True
+
+    if exchange_id == "bitget" and base.startswith("R"):
+        if base[1:] in STOCK_TICKERS:
+            return True
+
+    if base.endswith("X") and base[:-1] in STOCK_TICKERS:
+        return True
+
+    if symbol_upper.endswith("/USDT") and base.startswith("R"):
+        if base[1:] in STOCK_TICKERS:
+            return True
+
+    return False
+
+
 class BotRunner:
     def __init__(self):
         self.telegram = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -304,7 +381,16 @@ class BotRunner:
 
     async def get_symbols(self, exchange) -> List[str]:
         markets = await exchange.load_markets()
-        symbols = []
+        symbols: List[str] = []
+        exchange_id = str(getattr(exchange, "id", "")).lower().strip()
+
+        excluded_counts = {
+            "manual": 0,
+            "stablecoin": 0,
+            "memecoin": 0,
+            "leveraged": 0,
+            "tokenized_stock": 0,
+        }
 
         for symbol, market in markets.items():
             if not market.get("active", True):
@@ -312,37 +398,52 @@ class BotRunner:
             if not market.get("spot", False):
                 continue
 
-            normalized_symbol = symbol.upper().strip()
-            base = str(market.get("base", "")).upper().strip()
-            quote = str(market.get("quote", "")).upper().strip()
+            normalized_symbol = str(symbol).upper().strip()
+            base = str(market.get("base", "") or "").upper().strip()
+            quote = str(market.get("quote", "") or "").upper().strip()
 
             if normalized_symbol in EXCLUDE_SYMBOLS:
+                excluded_counts["manual"] += 1
                 continue
             if quote not in QUOTE_ASSETS:
                 continue
-            if ":" in symbol:
+            if ":" in str(symbol):
                 continue
 
-            # استبعاد العملات المستقرة والمرتبطة بسعر ثابت.
             if base in STABLECOIN_BASES:
-                logger.debug("Stablecoin excluded: %s", symbol)
+                excluded_counts["stablecoin"] += 1
                 continue
 
-            # استبعاد العملات الميمية المحددة.
             if base in MEMECOIN_BASES:
-                logger.debug("Memecoin excluded: %s", symbol)
+                excluded_counts["memecoin"] += 1
                 continue
 
-            # استبعاد رموز الرافعة المالية مثل BTC3L وETH5S وBULL وBEAR.
             if base.endswith(LEVERAGED_SUFFIXES):
-                logger.debug("Leveraged token excluded: %s", symbol)
+                excluded_counts["leveraged"] += 1
+                continue
+
+            if is_tokenized_stock(exchange_id, symbol, market):
+                excluded_counts["tokenized_stock"] += 1
+                logger.info("Tokenized stock excluded: %s on %s", symbol, exchange_id)
                 continue
 
             symbols.append(symbol)
 
         symbols = sorted(set(symbols))
+
         if MAX_SYMBOLS_PER_EXCHANGE > 0:
             symbols = symbols[:MAX_SYMBOLS_PER_EXCHANGE]
+
+        logger.info(
+            "%s filters | manual=%d stable=%d meme=%d leveraged=%d stocks=%d accepted=%d",
+            exchange_id,
+            excluded_counts["manual"],
+            excluded_counts["stablecoin"],
+            excluded_counts["memecoin"],
+            excluded_counts["leveraged"],
+            excluded_counts["tokenized_stock"],
+            len(symbols),
+        )
         return symbols
 
     async def analyze_symbol(self, exchange, exchange_id: str, symbol: str) -> Optional[Tuple[str, str, Dict[str, float]]]:
@@ -419,6 +520,26 @@ Prev Hist: {r['prev_hist']:.8f}
                 if not result:
                     continue
                 ex_id, symbol, data = result
+
+                base_from_symbol = symbol.split("/")[0].upper().strip()
+                if (
+                    base_from_symbol in TOKENIZED_STOCK_BASES
+                    or (
+                        base_from_symbol.startswith("R")
+                        and base_from_symbol[1:] in STOCK_TICKERS
+                    )
+                    or (
+                        base_from_symbol.endswith("X")
+                        and base_from_symbol[:-1] in STOCK_TICKERS
+                    )
+                ):
+                    logger.warning(
+                        "Blocked tokenized stock before Telegram send: %s on %s",
+                        symbol,
+                        ex_id,
+                    )
+                    continue
+
                 key = f"{ex_id}:{symbol}:{TIMEFRAME}:{data['candle_mode']}"
                 if not self.cooldown_ok(key):
                     continue
@@ -446,7 +567,11 @@ Prev Hist: {r['prev_hist']:.8f}
     async def run(self):
         if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
             raise RuntimeError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID")
-        await self.send("✅ Bot started: ta Stoch RSI + MACD + 4H candle volume + min volume increase")
+        logger.info("Running bot version: %s", BOT_VERSION)
+        await self.send(
+            f"✅ Bot started: {BOT_VERSION}\n"
+            "Stoch RSI + MACD + 4H volume + stock-token filter"
+        )
         while True:
             try:
                 await self.scan_once()
